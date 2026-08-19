@@ -1,0 +1,19 @@
+[project]
+name = "radiocontrol"
+version = "0.1.0"
+description = "Radio command CLI"
+requires-python = ">3.11"
+
+[project.scripts]
+p5 = "radiocontrol:p5"
+p20 = "radiocontrol:p20"
+p40 = "radiocontrol:p40"
+p60 = "radiocontrol:p60"
+p80 = "radiocontrol:p80"
+p100 = "radiocontrol:p100"
+Scott = "radiocontrol:Scott"
+NoScott = "radiocontrol:NoScott"
+PCOff = "radiocontrol:pcoff"
+PCON = "radiocontrol:pcon"
+CapeCod = "radiocontrol:CapeCod"
+Charlotte = "radiocontrol:Charlotte"
