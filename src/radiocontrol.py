@@ -1,6 +1,7 @@
 # import time
+# import cmd
 import socket
-import os
+# import os
 
 global DEBUG 
 _socket_handle = None
@@ -33,7 +34,12 @@ CW_Audio_Treble = "EX"+CW_Setting+Mode_CW+Sel_Treble+Treble_Setting
 CW_Audio_Mid    = "EX"+CW_Setting+Mode_CW+Sel_Mid+Mid_Setting
 CW_Audio_Bass   = "EX"+CW_Setting+Mode_CW+Sel_Bass+Bass_Setting
 
-
+"""
+Following are the backbone commands for radio control
+get_socket_handle() - returns the socket handle, opening it if not already open
+close_socket() - cleanly close the socket when done
+send_rig(cmd) - sends a command to the rig via TCP socket and returns the response
+"""
 
 
 
@@ -85,24 +91,33 @@ def send_rig(cmd: str):
         return None
 
     try:
-        # Create a socket connection
-        s.sendall(cmd.encode('utf-8'))
-        if DEBUG:
-            print(f"Sent command: {cmd.strip()}")
+        full_cmd = f"{cmd}\n"   # lowercase w, newline terminator
+        s.sendall(full_cmd.encode('utf-8'))
+        print(f"Sent command: {full_cmd.strip()}")
 
-        # Optional: Read the rigctld response (e.g., RPRT 0 for success)
-        # response = s.recv(1024).decode('utf-8')
-        # print(f"Response: {response.strip()}")
-        # return response
-        return
-    
+        # ALWAYS drain the response, even for set commands,
+        # or leftover bytes will corrupt the next read on this socket
+        response = s.recv(1024).decode('utf-8').strip()
+        if DEBUG:
+            print(f"Response: {response}")
+        return response
+ 
     except socket.error as e:
         print(f"Socket error sending command: {e}")
         # Force socket to reopen next time
         global _socket_handle
         _socket_handle = None
         return None
+"""
+Basic commands for the radio
+p5, p20, p40, p60, p80, p100 - set power levels 
+Scott - set radio for Scott CW operation via Zoom   
+NoScott - set radio for normal CW operation
+SetCW - set radio for CW operation with specific settings 
+pcoff - turn off PC keying control
+pcon - turn on PC keying control
 
+"""
 def p5():
     if DEBUG:
         print("\np5 detected\n")
@@ -144,16 +159,10 @@ def Scott():
     if DEBUG:
         print("\nScott detected\n")
 
-    print("\nSetting BREAKIN OFF")
-    send_rig("W BI0; 0")
-
-    print("\nSetting MONITOR to 25")
-    # send_rig("W ML1025; 0")
-    os.system('cmd /c "rigctl -m 2 --skip-init W ML1025; 0"')
-
-    print("\nSetting SPEED to 20 WPM")
-    # send_rig("W KS020; 0")
-    os.system('cmd /c "rigctl -m 2 --skip-init W KS020; 0"')
+    send_rig("W BI0; 0")        # Set BREAK-IN to OFF
+    send_rig("W ML1025; 0")     # Set MONITOR to 25
+    send_rig("W KS020; 0")      # Set KEY SPEED to 20 WPM
+    send_rig("W KR1; 0")        # Set KEYER to ON
 
     return
  
@@ -161,52 +170,56 @@ def NoScott():
     if DEBUG:
         print("\nNoScott detected\n")
 
-    print("\nSetting BREAKIN ON")
-    send_rig("W BI1; 0")
-
-    print("\nSetting MONITOR to 15")
-    # send_rig("W ML1015; 0")
-    os.system('cmd /c "rigctl -m 2 --skip-init W ML1015; 0"')
-
-    print("\nSetting SPEED to 26 WPM")
-    # send_rig("W KS026; 0")
-    os.system('cmd /c "rigctl -m 2 --skip-init W KS026; 0"')
-
+    send_rig("W BI1; 0")        # Set BREAK-IN to ON
+    send_rig("W ML1010; 0")     # Set MONITOR to 10
+    send_rig("W KR1; 0")        # Set KEYER to ON
+    send_rig("W KS024; 0")      # Set KEY SPEED to 24 WPM
     return
 
 def pcoff():
     if DEBUG:
         print("\npcoff detected\n")
-    cmd = "W EX0201160; 0"
+
     """ 
         02 = CW Setting
         01 = Mode CW
         16 = PC Keying
         0  = PC Keying Control off
     """
-    send_rig(cmd)
+    send_rig("W EX0201160; 0")
     return
 
 def pcon():
     if DEBUG:
         print("\npcon detected\n")
-    cmd = "W EX0201162; 0"
+
     """ 
         02 = CW Setting
         01 = Mode CW
         16 = PC Keying
         2  = RTS
     """
-    send_rig(cmd)
+    send_rig("W EX0201162; 0")
     return
  
 def setCW():
     
-#    CW_List = []"MD1",
+#    MODE = "MD03", MONITOR = 15, SPEED = 24 WPM, BREAKIN = ON, 
+#    PC KEYING = RTS, PC KEYING CONTROL = ON, CW AUDIO TREBLE = 0, CW AUDIO MID = 0, CW AUDIO BASS = 0  
+#    PITCH = 550, BK-DELAY = 200
+#    
     if DEBUG:
         print("\nSet radio for CW operation\n")
-    cmd = "W MD1; 0"
-    send_rig(cmd)
+    send_rig("W MD03; 0")       # Set MODE to CW
+    send_rig("W AB; 0")         # Set VCOB to VCOA value
+    send_rig("W ML1010; 0")     # Set MONITOR to 10
+    send_rig("W KS024; 0")      # Set KEY SPEED to 24 WPM
+    send_rig("W BI1; 0")        # Set BREAK-IN to ON
+    send_rig("W KR1; 0")        # Set KEYER to ON
+    send_rig("W KP25; 0")       # Set PITCH to 550
+    send_rig("W RF04; 0")       # Set ROOFING FILTER to 500Hz
+    send_rig("W SH0007; 0")     # Set FILTER_SIDTH to 350Hz
+
     return
 
 # FT8 Settings
@@ -225,3 +238,8 @@ def setCW():
 #   HCUT FREQ, LCUT FREQ to OFF
 #   DATA SHIFT (SSB) was 1500, set to 0
 #   
+
+def test():
+    if DEBUG:
+        print("\nTest function detected\n")
+        return 43
