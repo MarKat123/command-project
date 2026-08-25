@@ -1,0 +1,9 @@
+build/lib/cmdstructure/__init__.py
+build/lib/cmdstructure/cmdstructure.py
+src/ClaudSocketHandling
+src/__pycache__/radiocontrol.cpython-314.pyc
+src/radiocontrol.egg-info/dependency_links.txt
+src/radiocontrol.egg-info/entry_points.txt
+src/radiocontrol.egg-info/PKG-INFO
+src/radiocontrol.egg-info/SOURCES.txt
+src/radiocontrol.egg-info/top_level.txt
