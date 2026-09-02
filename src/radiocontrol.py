@@ -1,7 +1,6 @@
-# import time
-# import cmd
 import socket
-# import os
+import winreg
+import ctypes
 
 global DEBUG 
 _socket_handle = None
@@ -220,6 +219,9 @@ def setCW():
     send_rig("W RF04; 0")       # Set ROOFING FILTER to 500Hz
     send_rig("W SH0007; 0")     # Set FILTER_SIDTH to 350Hz
 
+    if setCWfrequency() == None:    # Set frequency to CW portion of band
+        print("Failed to set CW frequency")
+        
     return
 
 # FT8 Settings
@@ -238,8 +240,139 @@ def setCW():
 #   HCUT FREQ, LCUT FREQ to OFF
 #   DATA SHIFT (SSB) was 1500, set to 0
 #   
+def getfrequency():
+    if DEBUG:
+        print("\nGet frequency detected\n")
+
+    frequencystring= send_rig("w FA; 12")      # Send command to read frequency
+    if frequencystring is None:
+        print("No response from rig — comm error")
+        return None
+    if DEBUG:
+        print(f"Frequency received: {frequencystring}")
+        print(f"Frequency integer: {int(''.join(filter(str.isdigit, frequencystring)))}")
+
+    return int("".join(filter(str.isdigit, frequencystring)))
+
+def setfrequency(frequency: int):
+    if DEBUG:
+        print(f"\nSet frequency to {frequency}\n")
+    send_rig(f"W FA{str(frequency).zfill(9)}; 0")
+    return
 
 def test():
     if DEBUG:
         print("\nTest function detected\n")
+#        junk = test2()  # unused for now, but will be useful for future debug and testing
+#        print("\nTest2 returned: ", junk, "\n")
         return 43
+
+def setCWfrequency():
+    if DEBUG:
+        print("\nSet CW frequency function detected\n")
+        # Set frequency to CW portion of band, to be used with SetCW
+        currentfrequency = getfrequency()
+        if currentfrequency is None:
+            print("Failed to retrieve frequency")
+            return None
+        
+        if currentfrequency >=  350000  and currentfrequency <=  3600000: return 
+        if currentfrequency >=  7000000 and currentfrequency <=  7125000: return 
+        if currentfrequency >= 14000000 and currentfrequency <= 14150000: return 
+        if currentfrequency >= 18068000 and currentfrequency <= 18110000: return
+        if currentfrequency >= 21000000 and currentfrequency <= 21200000: return
+        if currentfrequency >= 28000000 and currentfrequency <= 28300000: return
+
+        
+        if currentfrequency > 3600000 and currentfrequency <= 400000:
+            setfrequency(3530000)
+
+        if currentfrequency > 7125000 and currentfrequency <= 7300000:
+            setfrequency(7030000)
+
+        if currentfrequency > 14150000 and currentfrequency <= 14351000:
+            setfrequency(14030000)
+
+        if currentfrequency > 18068000 and currentfrequency <= 18110000:
+            setfrequency(18070000)
+
+        elif currentfrequency > 21200000 and currentfrequency <= 21450000:
+            setfrequency(21030000)
+ 
+        elif currentfrequency > 28300000 and currentfrequency <= 29700000: 
+            setfrequency(28030000)
+
+        else:
+            print("Frequency not in any known band")
+            return None
+
+        return
+
+def get_user_env_var(name: str, default: str | None = None):
+    """
+    Reads a Windows user-level environment variable straight from the registry,
+    so it reflects the current persisted value even if this process started
+    before the variable was last set.
+    """
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_READ)
+        try:
+            value, _ = winreg.QueryValueEx(key, name)
+            return value
+        finally:
+            winreg.CloseKey(key)
+    except FileNotFoundError:
+        return default
+
+def set_user_env_var(name: str, value: str):
+    """
+    Persists a Windows user-level environment variable and broadcasts
+    WM_SETTINGCHANGE so newly launched processes pick it up without a
+    logoff/logon.
+    """
+    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE)
+    try:
+        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+    finally:
+        winreg.CloseKey(key)
+
+    HWND_BROADCAST = 0xFFFF
+    WM_SETTINGCHANGE = 0x1A
+    SMTO_ABORTIFHUNG = 0x0002
+    result = ctypes.c_long()
+    ctypes.windll.user32.SendMessageTimeoutW(
+        HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+        SMTO_ABORTIFHUNG, 5000, ctypes.byref(result)
+    )
+
+def CapeCod():
+    if DEBUG:
+        print("\nCapeCod detected\n")
+    set_user_env_var("LOCATION", "CAPECOD")
+    return
+
+def Charlotte():
+    if DEBUG:
+        print("\nCharlotte detected\n")
+    set_user_env_var("LOCATION", "CHARLOTTE")
+    return
+
+# basic Full Tuning function for CW operation.  This will have to be fleshed out
+# later to include SSB tuning operation, but for now it has about the same
+# functionality as what the ft.py routine has in the old command project. 
+
+def ft():
+    if DEBUG:
+        print("\nFull Tune detected\n")
+    # Disable keyer, remove split, set power to 5W
+    send_rig("W KR0; 0")        # Set KEYER to OFF
+    send_rig("W BI1; 0")        # Set BREAK-IN to ON
+    send_rig("W ST0; 0")        # Set SPLIT to OFF
+    send_rig("W PC005; 0")      # Set POWER to 5
+
+    input("Press Enter to continue...")
+
+    # Enable keyer, set power to 100W
+    send_rig("W KR1; 0")        # Set KEYER to ON
+    send_rig("W AB; 0")         # Set VFOB to VFOA value
+    send_rig("W PC100; 0")      # Set POWER to 100
