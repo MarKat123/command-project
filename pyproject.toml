@@ -1,8 +1,16 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "radiocontrol"
-version = "0.1.0"
+version = "0.2.0"
 description = "Radio command CLI"
 requires-python = ">3.11"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["radiocontrol"]
 
 [project.scripts]
 p5 = "radiocontrol:p5"
@@ -19,3 +27,6 @@ CapeCod = "radiocontrol:CapeCod"
 Charlotte = "radiocontrol:Charlotte"
 setCW = "radiocontrol:setCW"
 test = "radiocontrol:test"
+setdebug = "radiocontrol:setdebug"
+unsetdebug = "radiocontrol:unsetdebug"
+ft = "radiocontrol:ft"

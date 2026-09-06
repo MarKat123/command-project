@@ -1,12 +1,8 @@
-# import time
-# import cmd
 import socket
-# import os
+import winreg
+import ctypes
 
-global DEBUG 
 _socket_handle = None
-
-DEBUG = True
 
 CW_Mode = "MD03"
 USB_Mode = "MD02"
@@ -64,7 +60,7 @@ def get_socket_handle(host: str = 'localhost', port: int = 4532):
     try:
         _socket_handle = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         _socket_handle.connect((host, port))
-        if DEBUG:
+        if checkdebug():
             print(f"Socket opened to {host}:{port}")
         return _socket_handle
     except socket.error as e:
@@ -93,12 +89,13 @@ def send_rig(cmd: str):
     try:
         full_cmd = f"{cmd}\n"   # lowercase w, newline terminator
         s.sendall(full_cmd.encode('utf-8'))
-        print(f"Sent command: {full_cmd.strip()}")
+        if checkdebug():
+            print(f"Sent command: {full_cmd.strip()}")
 
         # ALWAYS drain the response, even for set commands,
         # or leftover bytes will corrupt the next read on this socket
         response = s.recv(1024).decode('utf-8').strip()
-        if DEBUG:
+        if checkdebug():
             print(f"Response: {response}")
         return response
  
@@ -119,44 +116,44 @@ pcon - turn on PC keying control
 
 """
 def p5():
-    if DEBUG:
+    if checkdebug():
         print("\np5 detected\n")
     send_rig("W PC005; 0")
     return
 
 def p20():
-    if DEBUG:
+    if checkdebug():
         print("\np20 detected\n")
     send_rig("W PC020; 0")
     return
 
 def p40():
-    if DEBUG:
+    if checkdebug():
         print("\np40 detected\n")
     send_rig("W PC040; 0")
     return
 
 def p60():
-    if DEBUG:
+    if checkdebug():
         print("\np60 detected\n")
     send_rig("W PC060; 0")
     return
 
 def p80():
-    if DEBUG:
+    if checkdebug():
         print("\np80 detected\n")
     send_rig("W PC080; 0")
     return
 
 
 def p100():
-    if DEBUG:
+    if checkdebug():
         print("\np100 detected\n")
     send_rig("W PC100; 0")
     return
 
 def Scott():
-    if DEBUG:
+    if checkdebug():
         print("\nScott detected\n")
 
     send_rig("W BI0; 0")        # Set BREAK-IN to OFF
@@ -167,7 +164,7 @@ def Scott():
     return
  
 def NoScott():
-    if DEBUG:
+    if checkdebug():
         print("\nNoScott detected\n")
 
     send_rig("W BI1; 0")        # Set BREAK-IN to ON
@@ -177,7 +174,7 @@ def NoScott():
     return
 
 def pcoff():
-    if DEBUG:
+    if checkdebug():
         print("\npcoff detected\n")
 
     """ 
@@ -190,7 +187,7 @@ def pcoff():
     return
 
 def pcon():
-    if DEBUG:
+    if checkdebug():
         print("\npcon detected\n")
 
     """ 
@@ -208,10 +205,9 @@ def setCW():
 #    PC KEYING = RTS, PC KEYING CONTROL = ON, CW AUDIO TREBLE = 0, CW AUDIO MID = 0, CW AUDIO BASS = 0  
 #    PITCH = 550, BK-DELAY = 200
 #    
-    if DEBUG:
+    if checkdebug():
         print("\nSet radio for CW operation\n")
     send_rig("W MD03; 0")       # Set MODE to CW
-    send_rig("W AB; 0")         # Set VCOB to VCOA value
     send_rig("W ML1010; 0")     # Set MONITOR to 10
     send_rig("W KS024; 0")      # Set KEY SPEED to 24 WPM
     send_rig("W BI1; 0")        # Set BREAK-IN to ON
@@ -220,7 +216,12 @@ def setCW():
     send_rig("W RF04; 0")       # Set ROOFING FILTER to 500Hz
     send_rig("W SH0007; 0")     # Set FILTER_SIDTH to 350Hz
 
-    return
+    if setCWfrequency() == None:    # Set frequency to CW portion of band
+        print("Failed to set CW frequency")
+        return None
+
+    send_rig("W AB; 0")         # Set VCOB to VCOA value 
+    return 1
 
 # FT8 Settings
 # set DATA-U mode
@@ -238,8 +239,167 @@ def setCW():
 #   HCUT FREQ, LCUT FREQ to OFF
 #   DATA SHIFT (SSB) was 1500, set to 0
 #   
+def getfrequency():
+    if checkdebug():
+        print("\nGet frequency detected\n")
+
+    frequencystring= send_rig("W FA; 12")      # Send command to read frequency
+    if frequencystring is None:
+        print("No response from rig — comm error")
+        return None
+    if checkdebug():
+        print(f"Frequency received: {frequencystring}")
+        print(f"Frequency integer: {int(''.join(filter(str.isdigit, frequencystring)))}")
+
+    return int("".join(filter(str.isdigit, frequencystring)))
+
+def setfrequency(frequency: int):
+    if checkdebug():
+        print(f"\nSet frequency cmd  W FA{str(frequency).zfill(9)}; 0\n")
+    send_rig(f"W FA{str(frequency).zfill(9)}; 0")
+
+    if checkdebug():
+        # read VFOA frequency to verify it was set correctly
+        frequencystring = send_rig("W FA; 12")
+        if frequencystring is not None:
+            print(f"Verified frequency: {frequencystring}")
+    return
 
 def test():
-    if DEBUG:
+    if checkdebug():
         print("\nTest function detected\n")
+#        junk = test2()  # unused for now, but will be useful for future debug and testing
+#        print("\nTest2 returned: ", junk, "\n")
         return 43
+
+def setCWfrequency():
+    if checkdebug():
+        print("\nSet CW frequency function detected\n")
+        # Set frequency to CW portion of band, to be used with SetCW
+    currentfrequency = getfrequency()
+    if currentfrequency is None:
+        print("Failed to retrieve frequency")
+        return None
+        
+    if currentfrequency >=  350000  and currentfrequency <=  3600000: return 1
+    if currentfrequency >=  7000000 and currentfrequency <=  7125000: return 1
+    if currentfrequency >= 10100000 and currentfrequency <= 10150000: return 1
+    if currentfrequency >= 14000000 and currentfrequency <= 14150000: return 1
+    if currentfrequency >= 18068000 and currentfrequency <= 18110000: return 1
+    if currentfrequency >= 21000000 and currentfrequency <= 21200000: return 1
+    if currentfrequency >= 28000000 and currentfrequency <= 28300000: return 1
+        
+    if currentfrequency > 3600000 and currentfrequency <= 400000:
+        setfrequency(3530000)
+        return 1
+
+    if currentfrequency > 7125000 and currentfrequency <= 7300000:
+        setfrequency(7030000)
+        return 1
+
+    if currentfrequency > 14150000 and currentfrequency <= 14350000:
+        setfrequency(14030000)
+        return 1
+
+    if currentfrequency > 18068000 and currentfrequency <= 18110000:
+        setfrequency(18070000)
+        return 1
+
+    if currentfrequency > 21200000 and currentfrequency <= 21450000:
+        setfrequency(21030000)
+        return 1
+
+    if currentfrequency > 28300000 and currentfrequency <= 29700000:
+        setfrequency(28030000)
+
+    else:
+        print("Frequency not in any known band")
+        return None
+
+    return None
+
+def get_user_env_var(name: str, default: str | None = None):
+    """
+    Reads a Windows user-level environment variable straight from the registry,
+    so it reflects the current persisted value even if this process started
+    before the variable was last set.
+    """
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_READ)
+        try:
+            value, _ = winreg.QueryValueEx(key, name)
+            return value
+        finally:
+            winreg.CloseKey(key)
+    except FileNotFoundError:
+        return default
+
+def set_user_env_var(name: str, value: str):
+    """
+    Persists a Windows user-level environment variable and broadcasts
+    WM_SETTINGCHANGE so newly launched processes pick it up without a
+    logoff/logon.
+    """
+    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE)
+    try:
+        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+    finally:
+        winreg.CloseKey(key)
+
+    HWND_BROADCAST = 0xFFFF
+    WM_SETTINGCHANGE = 0x1A
+    SMTO_ABORTIFHUNG = 0x0002
+    result = ctypes.c_long()
+    ctypes.windll.user32.SendMessageTimeoutW(
+        HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+        SMTO_ABORTIFHUNG, 5000, ctypes.byref(result)
+    )
+
+def CapeCod():
+    if checkdebug():
+        print("\nCapeCod detected\n")
+    set_user_env_var("LOCATION_VAR", "CAPECOD")
+    return
+
+def Charlotte():
+    if checkdebug():
+        print("\nCharlotte detected\n")
+    set_user_env_var("LOCATION_VAR", "CHARLOTTE")
+    return
+
+# basic Full Tuning function for CW operation.  This will have to be fleshed out
+# later to include SSB tuning operation, but for now it has about the same
+# functionality as what the ft.py routine has in the old command project. 
+
+def ft():
+    if checkdebug():
+        print("\nFull Tune detected\n")
+    # Disable keyer, remove split, set power to 5W
+    send_rig("W KR0; 0")        # Set KEYER to OFF
+    send_rig("W BI1; 0")        # Set BREAK-IN to ON
+    send_rig("W ST0; 0")        # Set SPLIT to OFF
+    send_rig("W PC005; 0")      # Set POWER to 5
+
+    input("Press Enter to continue...")
+
+    # Enable keyer, set power to 100W
+    send_rig("W KR1; 0")        # Set KEYER to ON
+    send_rig("W AB; 0")         # Set VFOB to VFOA value
+    send_rig("W PC100; 0")      # Set POWER to 100
+
+def checkdebug() -> bool:
+    """
+    Reads the persisted DEBUG flag from the registry. Unlike a plain module
+    global, this reflects setdebug()/unsetdebug() calls made in a prior,
+    separate command-line invocation - each command is its own process, so
+    an in-memory flag wouldn't survive between them.
+    """
+    return get_user_env_var("DEBUG", "0") == "1"
+
+def setdebug():
+    set_user_env_var("DEBUG", "1")
+    return
+
+def unsetdebug():
+    set_user_env_var("DEBUG", "0")
+    return
