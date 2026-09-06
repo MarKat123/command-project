@@ -128,15 +128,25 @@ available outside VS Code.
 
 ## History
 
-- **260824_1** — Fixed a bug in command formatting when sending via TCP
-  socket (added `\n`). Rewrote command sending to go over the TCP socket
-  instead of shelling out via the system. Added `setCW()` for a baseline CW
-  operating profile. Minor tweaks to `Scott()`. Added `test()` as a
-  placeholder for exercising the `pip install -e .` / entry-point setup.
-- **2026** — Diagnosed and fixed a broken editable install (package had
+Versions follow [SemVer](https://semver.org/) (`MAJOR.MINOR.PATCH`), tracked
+in `pyproject.toml`'s `[project] version`, with a git tag (`vX.Y.Z`) marking
+each point this project was archived. `git tag` lists all of them;
+`git log v0.1.0..v0.2.0` shows exactly what changed between two.
+
+- **v0.1.0** (untagged, historical; noted as `260824_1` before tagging
+  started) — Fixed a bug in command formatting when sending via TCP socket
+  (added `\n`). Rewrote command sending to go over the TCP socket instead of
+  shelling out via the system. Added `setCW()` for a baseline CW operating
+  profile. Minor tweaks to `Scott()`. Added `test()` as a placeholder for
+  exercising the `pip install -e .` / entry-point setup.
+- **v0.2.0** — Diagnosed and fixed a broken editable install (package had
   drifted into a stale, non-editable global copy); added `[build-system]`
   config; fixed a module-name typo in `launch.json`; added the
   `scripts/debug_entry.py` debug launcher; added `CapeCod()` / `Charlotte()`
-  and the `LOCATION` env var helpers; set up the pipx production install
+  and the `LOCATION_VAR` env var helpers; set up the pipx production install
   described above; fixed a `setcwfrequency`/`setCWfrequency` case-mismatch
-  bug in `setCW()`.
+  bug in `setCW()`; reworked debug output to persist across separate
+  command-line invocations via `checkdebug()` / `setdebug()` / `unsetdebug()`
+  (registry-backed, replacing the old in-memory `DEBUG` global); added
+  `ft()` for a basic full-tune sequence; adopted SemVer + git tags for
+  versioning.
