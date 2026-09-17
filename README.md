@@ -150,3 +150,12 @@ each point this project was archived. `git tag` lists all of them;
   (registry-backed, replacing the old in-memory `DEBUG` global); added
   `ft()` for a basic full-tune sequence; adopted SemVer + git tags for
   versioning.
+- **v0.3.0** — Added `panwidget`, a standalone console widget for the
+  FTDX10/FT-710 panadapter power (`SS04`) level: reads it once, tracks it
+  locally, sends absolute set commands on `+`/`-`, and resyncs on regaining
+  window focus. Anchors its window to the upper-right of the screen on
+  launch, but detects ConPTY-hosted terminals (VS Code integrated terminal,
+  Windows Terminal) and skips that positioning there rather than corrupting
+  the display. Added as its own module + entry point alongside
+  `radiocontrol`, plus a VS Code debug config that runs it in an external
+  terminal so the window-positioning code has a real console to work with.

@@ -13,6 +13,14 @@
             "justMyCode": true
         },
         {
+            "name": "Python: Debug panwidget",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "panwidget",
+            "console": "externalTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Debug entry point",
             "type": "debugpy",
             "request": "launch",
