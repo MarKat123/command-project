@@ -74,10 +74,11 @@ def close_socket():
     if _socket_handle is not None:
         try:
             _socket_handle.close()
-            print("Socket closed")
         except socket.error as e:
             print(f"Error closing socket: {e}")
         finally:
+            if checkdebug():
+                print("Socket closed")
             _socket_handle = None
 
 def send_rig(cmd: str):      

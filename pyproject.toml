@@ -10,7 +10,7 @@ requires-python = ">3.11"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["radiocontrol"]
+py-modules = ["radiocontrol", "panwidget"]
 
 [project.scripts]
 p5 = "radiocontrol:p5"
@@ -30,3 +30,4 @@ test = "radiocontrol:test"
 setdebug = "radiocontrol:setdebug"
 unsetdebug = "radiocontrol:unsetdebug"
 ft = "radiocontrol:ft"
+panwidget = "panwidget:run"
