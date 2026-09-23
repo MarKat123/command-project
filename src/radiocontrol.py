@@ -215,7 +215,7 @@ def setCW():
     send_rig("W KR1; 0")        # Set KEYER to ON
     send_rig("W KP25; 0")       # Set PITCH to 550
     send_rig("W RF04; 0")       # Set ROOFING FILTER to 500Hz
-    send_rig("W SH0007; 0")     # Set FILTER_SIDTH to 350Hz
+    send_rig("W SH0007; 0")     # Set FILTER_WIDTH to 350Hz
 
     if setCWfrequency() == None:    # Set frequency to CW portion of band
         print("Failed to set CW frequency")
@@ -264,6 +264,40 @@ def setfrequency(frequency: int):
         frequencystring = send_rig("W FA; 12")
         if frequencystring is not None:
             print(f"Verified frequency: {frequencystring}")
+    return
+
+def getmode():
+    if checkdebug():
+        print("\nGet mode detected\n")
+    modestring = send_rig("W MD0; 5")
+    if modestring is None or len(modestring) < 4:
+        print("Failed to retrieve mode")
+        return None
+    if checkdebug():
+        print(f"Mode received: {modestring}")
+    return modestring[3]   # the X in "MD0X;"
+
+def setmode(modechar: str):
+    if checkdebug():
+        print(f"\nSet mode cmd  W MD0{modechar}; 0\n")
+    send_rig(f"W MD0{modechar}; 0")
+    return
+
+def getpower():
+    if checkdebug():
+        print("\nGet power detected\n")
+    powerstring = send_rig("W PC; 6")
+    if powerstring is None or len(powerstring) < 5:
+        print("Failed to retrieve power")
+        return None
+    if checkdebug():
+        print(f"Power received: {powerstring}")
+    return int(powerstring[2:5])
+
+def setpower(watts: int):
+    if checkdebug():
+        print(f"\nSet power cmd  W PC{str(watts).zfill(3)}; 0\n")
+    send_rig(f"W PC{str(watts).zfill(3)}; 0")
     return
 
 def test():
@@ -368,25 +402,40 @@ def Charlotte():
     set_user_env_var("LOCATION_VAR", "CHARLOTTE")
     return
 
-# basic Full Tuning function for CW operation.  This will have to be fleshed out
-# later to include SSB tuning operation, but for now it has about the same
-# functionality as what the ft.py routine has in the old command project. 
+# Full Tuning function. Mode-agnostic: reads the rig's current mode/power
+# before touching anything, forces CW-U (required for the paddle's tuner
+# keydown tone) and low power for the actual tune, then restores exactly
+# what was there on entry. Safe to call from CW or SSB (or any other mode).
 
 def ft():
     if checkdebug():
         print("\nFull Tune detected\n")
-    # Disable keyer, remove split, set power to 5W
+
+    original_mode = getmode()
+    original_power = getpower()
+    if original_mode is None or original_power is None:
+        print("Failed to read current radio state — aborting Full Tune")
+        return None
+
+    # Enter tuning state: keyer off, break-in on, split off, VFO-A primary,
+    # force CW-U, power to 5W
+    setmode("3")                # Force CW-U (required for tuner keydown tone)
     send_rig("W KR0; 0")        # Set KEYER to OFF
     send_rig("W BI1; 0")        # Set BREAK-IN to ON
     send_rig("W ST0; 0")        # Set SPLIT to OFF
-    send_rig("W PC005; 0")      # Set POWER to 5
+    send_rig("W VS0; 0")        # Select VFO-A as primary
+    setpower(5)                 # Set POWER to 5W
 
     input("Press Enter to continue...")
 
-    # Enable keyer, set power to 100W
+    # Exit tuning state: keyer back on, sync VFOB, VFO-A stays primary
+    # (never exit with VFO-B selected), restore original mode and power
     send_rig("W KR1; 0")        # Set KEYER to ON
     send_rig("W AB; 0")         # Set VFOB to VFOA value
-    send_rig("W PC100; 0")      # Set POWER to 100
+    send_rig("W VS0; 0")        # Re-assert VFO-A as primary
+    setmode(original_mode)      # Restore original mode
+    setpower(original_power)    # Restore original power
+    return 1
 
 def checkdebug() -> bool:
     """

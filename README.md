@@ -159,3 +159,17 @@ each point this project was archived. `git tag` lists all of them;
   the display. Added as its own module + entry point alongside
   `radiocontrol`, plus a VS Code debug config that runs it in an external
   terminal so the window-positioning code has a real console to work with.
+- **v0.3.1** — Rewrote `ft()` (Full Tune) to be mode-agnostic instead of
+  CW-only: it now reads the rig's current mode and power before touching
+  anything (`getmode()` / `getpower()`, new alongside matching `setmode()` /
+  `setpower()`), forces CW-U and low power for the actual tune, then restores
+  exactly what was there on entry rather than hard-coding a return to 100W.
+  Also force-selects VFO-A as primary on both entry and exit (a rig behavior
+  that had previously caused confusion mid-operation when it silently ended
+  up on VFO-B), and, discovered during live testing, reordered the entry
+  sequence so the mode is forced to CW *before* the CW-gated `KR`/`BI`/`ST`
+  writes — this rig silently no-ops those writes unless it's already in CW
+  mode. Sets up `ft()` as a solid foundation for the upcoming band/mode
+  `t<band><mode>()` command family (replacing `setCW()`'s buggy
+  `setCWfrequency()` band-boundary logic), which depends on `ft()` working
+  correctly from any starting mode.
