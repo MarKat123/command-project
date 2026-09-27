@@ -8,7 +8,14 @@ keying, frequency, and a per-location `LOCATION` environment variable
 All the actual commands live as plain functions in [src/radiocontrol.py](src/radiocontrol.py)
 and are exposed as console scripts via `[project.scripts]` in
 [pyproject.toml](pyproject.toml) (`p5`, `p20`, `p40`, `p60`, `p80`, `p100`,
-`Scott`, `NoScott`, `PCOff`, `PCON`, `CapeCod`, `Charlotte`, `setCW`, `test`).
+`pmax`, `Scott`, `NoScott`, `PCOff`, `PCON`, `CapeCod`, `Charlotte`, `setCW`,
+`ft`, `test`), plus a `t<band>c`/`t<band>s` family for band/mode changes
+(`t160c`/`t160s` through `t10c`/`t10s`, and `t30c` with no `t30s` since 30m
+has no phone allocation). Each `t<band>c`/`t<band>s` command sets the band,
+mode, and frequency, caps power for that band (`pmax`), and runs `ft` (Full
+Tune) so the antenna gets tuned as part of the band change — declining to
+key the paddle and just pressing Enter leaves the rig on the new band/mode
+without actually transmitting.
 
 This file exists so that after this project sits untouched for weeks or
 months, picking it back up doesn't require re-deriving any of this from
@@ -159,3 +166,46 @@ each point this project was archived. `git tag` lists all of them;
   the display. Added as its own module + entry point alongside
   `radiocontrol`, plus a VS Code debug config that runs it in an external
   terminal so the window-positioning code has a real console to work with.
+- **v0.3.1** — Rewrote `ft()` (Full Tune) to be mode-agnostic instead of
+  CW-only: it now reads the rig's current mode and power before touching
+  anything (`getmode()` / `getpower()`, new alongside matching `setmode()` /
+  `setpower()`), forces CW-U and low power for the actual tune, then restores
+  exactly what was there on entry rather than hard-coding a return to 100W.
+  Also force-selects VFO-A as primary on both entry and exit (a rig behavior
+  that had previously caused confusion mid-operation when it silently ended
+  up on VFO-B), and, discovered during live testing, reordered the entry
+  sequence so the mode is forced to CW *before* the CW-gated `KR`/`BI`/`ST`
+  writes — this rig silently no-ops those writes unless it's already in CW
+  mode. Sets up `ft()` as a solid foundation for the upcoming band/mode
+  `t<band><mode>()` command family (replacing `setCW()`'s buggy
+  `setCWfrequency()` band-boundary logic), which depends on `ft()` working
+  correctly from any starting mode.
+- **v0.4.0** — Added the `t<band>c`/`t<band>s` command family (`t160c`/
+  `t160s` through `t10c`/`t10s`, plus `t30c` with no `t30s`), driven by a new
+  `BAND_PLAN` table of standard US amateur CW/SSB sub-band edges and default
+  frequencies, replacing `setCWfrequency()`'s buggy hardcoded ranges
+  entirely. `setCW()` is repurposed as a reusable CW settings bundle (no
+  longer touches frequency); a new `setSSB()` is its SSB corollary, picking
+  the correct sideband per band. Each `t<band>c`/`t<band>s` command also
+  sets the panadapter span (5kHz CW / 20kHz SSB), caps power for the band via
+  a new `pmax()` (also directly callable) driven by a `BAND_MAX_POWER` table
+  reflecting house RFI sensitivities that vary by band, and — after several
+  days of live use showed the operator wanting to tune essentially every
+  time anyway — runs `ft()` at the end, so a band change leaves the rig
+  tune-ready; declining to key the paddle and pressing Enter still leaves
+  the rig correctly on the new band/mode/power.
+  Also fixed, via live testing: `ft()`'s closing `AB;` (VFOB=VFOA) turns out
+  to copy mode as well as frequency, so it now fires *after* restoring
+  VFO-A's original mode rather than before, or VFO-B ended up stuck in the
+  CW-U tuning mode; VFO-A-primary selection (`VS0;`) moved out of `ft()`'s
+  entry sequence and into `setCW()`/`setSSB()` instead, since establishing
+  which VFO is primary belongs with establishing the mode, not with the
+  general-purpose tuning routine (`ft()` keeps its exit-side `VS0;` as a
+  safety net for standalone calls).
+  Separately, while chasing an intermittent hang traced to COM-port/rig
+  power interruptions: sockets now get an explicit `close_socket()` via
+  `atexit` (previously relied entirely on OS cleanup at process exit) and a
+  5-second timeout, so a dropped connection now fails with an actionable
+  message instead of hanging `recv()` forever; `getfrequency()` and
+  `getpower()` also now handle malformed/empty rig responses by returning
+  `None` instead of raising `ValueError`.
