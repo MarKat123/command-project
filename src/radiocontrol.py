@@ -199,10 +199,11 @@ def send_rig(cmd: str):
         return None
 """
 Basic commands for the radio
-p5, p20, p40, p60, p80, p100 - set power levels 
-Scott - set radio for Scott CW operation via Zoom   
+p5, p20, p40, p60, p80, p100 - set power levels
+pmax - set power to the max allowed for the current band (BAND_MAX_POWER)
+Scott - set radio for Scott CW operation via Zoom
 NoScott - set radio for normal CW operation
-SetCW - set radio for CW operation with specific settings 
+SetCW - set radio for CW operation with specific settings
 pcoff - turn off PC keying control
 pcon - turn on PC keying control
 
@@ -312,7 +313,7 @@ def pcon():
  
 def setCW():
 
-#    MODE = "MD03", MONITOR = 15, SPEED = 24 WPM, BREAKIN = ON,
+#    MODE = "MD03", MONITOR = 10, SPEED = 24 WPM, BREAKIN = ON,
 #    PC KEYING = RTS, PC KEYING CONTROL = ON, CW AUDIO TREBLE = 0, CW AUDIO MID = 0, CW AUDIO BASS = 0
 #    PITCH = 550, BK-DELAY = 200
 #
@@ -334,7 +335,14 @@ def setCW():
     send_rig("W KP25; 0")       # Set PITCH to 550
     send_rig("W RF04; 0")       # Set ROOFING FILTER to 500Hz
     send_rig("W SH0007; 0")     # Set FILTER_WIDTH to 350Hz
-    send_rig("W SS05200000; 0") # Set PANADAPTER SPAN to 5kHz
+    send_rig("W SS0520000; 0")  # Set PANADAPTER SPAN to 5kHz
+    send_rig("W SS0640000; 0")  # Center the panadapter cursor
+    # Scroll mode to CURSOR, with the (S) depth suffix -- per the CAT spec's
+    # SS P2=6 table, (L)/(N)/(S) size the spectrum-scope area above the
+    # waterfall, not the waterfall itself, so (S) = small scope area = the
+    # waterfall gets MORE depth, not less. (S) here is deliberate for a
+    # large waterfall, confirmed by hands-on experimentation on the rig.
+    send_rig("W SS0680000; 0")  # Set scroll mode to CURSOR, large waterfall depth
     return "3"                  # the CW-U mode char, for VFO-B sync callers
 
 def setSSB(band: str):
@@ -351,7 +359,14 @@ def setSSB(band: str):
     send_rig("W VS0; 0")        # Select VFO-A as primary
     modechar = band_info["sideband"][-1]
     setmode(modechar)
-    send_rig("W SS05400000; 0") # Set PANADAPTER SPAN to 20kHz
+    send_rig("W SS0540000; 0")  # Set PANADAPTER SPAN to 20kHz
+    send_rig("W SS0640000; 0")  # Center the panadapter cursor
+    # Scroll mode to CURSOR, with the (S) depth suffix -- per the CAT spec's
+    # SS P2=6 table, (L)/(N)/(S) size the spectrum-scope area above the
+    # waterfall, not the waterfall itself, so (S) = small scope area = the
+    # waterfall gets MORE depth, not less. (S) here is deliberate for a
+    # large waterfall, confirmed by hands-on experimentation on the rig.
+    send_rig("W SS0680000; 0")  # Set scroll mode to CURSOR, large waterfall depth
     return modechar             # for VFO-B sync callers
 
 # FT8 Settings
@@ -479,27 +494,32 @@ def setBandModeFrequency(band: str, mode: str):
 
 def tuneBand(band: str, mode: str):
     """Shared implementation behind every t<band>c()/t<band>s() command:
-    apply the mode settings, move to that segment's default frequency, copy
-    VFO A to VFO B, cap power for the band (pmax()), then run ft() to put
-    the rig in tune-ready state. ft() reads back whatever mode/power was
-    just set here as its "original" state, so declining to key the paddle
-    and just pressing Enter leaves the rig exactly on the band/mode/power
-    just selected -- actually tuning the antenna is still an operator
-    choice (paddle down or not), not automatic."""
+    move to that segment's default frequency FIRST, then apply the mode
+    settings (setCW()/setSSB() center the panadapter cursor on the current
+    frequency -- doing this before the frequency change left the cursor
+    centered on the old frequency, not the new one), copy VFO A to VFO B,
+    cap power for the band (pmax()), then run ft() to put the rig in
+    tune-ready state. ft() reads back whatever mode/power was just set here
+    as its "original" state, so declining to key the paddle and just
+    pressing Enter leaves the rig exactly on the band/mode/power just
+    selected -- actually tuning the antenna is still an operator choice
+    (paddle down or not), not automatic."""
     if checkdebug():
         print(f"\ntuneBand band={band} mode={mode} detected\n")
 
-    if mode == "cw":
-        modechar = setCW()
-    elif mode == "ssb":
-        modechar = setSSB(band)
-        if modechar is None:
-            return None
-    else:
+    if mode not in ("cw", "ssb"):
         print(f"Unknown mode: {mode}")
         return None
 
     setBandModeFrequency(band, mode)
+
+    if mode == "cw":
+        modechar = setCW()
+    else:
+        modechar = setSSB(band)
+        if modechar is None:
+            return None
+
     send_rig("W AB; 0")         # Set VFOB to VFOA value
     pmax()                       # Cap power for this band before tuning
     ft()
@@ -637,12 +657,14 @@ def CapeCod():
     if checkdebug():
         print("\nCapeCod detected\n")
     set_user_env_var("LOCATION_VAR", "CAPECOD")
+    set_user_env_var("RIG_COM", "COM7")
     return
 
 def Charlotte():
     if checkdebug():
         print("\nCharlotte detected\n")
     set_user_env_var("LOCATION_VAR", "CHARLOTTE")
+    set_user_env_var("RIG_COM", "COM5")
     return
 
 # Full Tuning function. Mode-agnostic: reads the rig's current mode/power
