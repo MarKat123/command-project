@@ -209,3 +209,20 @@ each point this project was archived. `git tag` lists all of them;
   message instead of hanging `recv()` forever; `getfrequency()` and
   `getpower()` also now handle malformed/empty rig responses by returning
   `None` instead of raising `ValueError`.
+- **v0.4.1** — Fixed a real bug in `tuneBand()`: `setCW()`/`setSSB()` ran
+  *before* `setBandModeFrequency()`, so their panadapter-cursor-centering
+  commands centered on the stale pre-change frequency instead of the new
+  one; frequency is now set first. Also fixed the `SS05` (panadapter span)
+  commands, which had one extra zero (`SS05200000;`/`SS05400000;` instead
+  of the spec's fixed 7-digit `SS0520000;`/`SS0540000;` format) — caught by
+  cross-checking against the operator's FTDX10 CAT Operation Reference
+  Manual directly. Added panadapter cursor-centering and cursor-scroll-mode
+  commands to `setCW()`/`setSSB()` (`SS06` sub-command): per the CAT spec's
+  `(L)/(N)/(S)` depth suffix, which sizes the spectrum-scope area rather
+  than the waterfall itself, `(S)` gives the *largest* waterfall depth —
+  confirmed by hands-on experimentation, not just spec-reading. `CapeCod()`/
+  `Charlotte()` now also persist a `RIG_COM` env var (COM7/COM5) consumed by
+  the `rigctld` boot task to pick the right serial port per location. Minor
+  comment accuracy fixes (`pmax` added to the command summary docstring;
+  `setCW()`'s header comment corrected from a stale `MONITOR = 15` to the
+  actual `MONITOR = 10`).
