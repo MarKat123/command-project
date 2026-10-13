@@ -126,12 +126,37 @@ available outside VS Code.
 ## Known quirks
 
 - `pyproject.toml` declares `CapeCod` and `Charlotte` entry points; they set
-  a `LOCATION` Windows user environment variable to `CAPECOD` / `CHARLOTTE`
-  respectively via `set_user_env_var()` in `radiocontrol.py` (registry write
-  + `WM_SETTINGCHANGE` broadcast, so new processes see it without a
+  `LOCATION_VAR` (`CAPECOD`/`CHARLOTTE`) and `RIG_COM` (`COM7`/`COM5` — the
+  serial port for that location's radio) as Windows user environment
+  variables via `set_user_env_var()` in `radiocontrol.py` (registry write +
+  `WM_SETTINGCHANGE` broadcast, so new processes see it without a
   logoff/logon). `get_user_env_var()` reads straight from the registry
   rather than `os.environ`, since `os.environ` would only reflect the value
   at the time the *current* process started.
+
+- **`rigctld` runs persistently via a Task Scheduler entry named
+  `RigctlDaemon`** (Action: `rigctld.exe` with Arguments
+  `-r %RIG_COM% %RIG_DAEMON_ARGS%`, Principal `MarkS`, LogonType `Password`
+  — a full logon, so it *does* load the user profile/registry and sees
+  `RIG_COM` correctly; this isn't a SYSTEM-context task). `RIG_DAEMON_ARGS`
+  (e.g. `-m 1042 -s 38400` — model + baud) is a separate environment
+  variable you set by hand (System or User scope both work for this
+  particular task), not something any code here writes.
+  - If this variable is ever missing/unset, hamlib silently defaults
+    `rigctld` to **model 1, the Dummy backend** — it still opens its TCP
+    port and accepts connections fine (so a plain socket/TCP test looks
+    totally healthy), it just never talks to real hardware, so any command
+    expecting an actual CAT reply hangs forever. A hang with working TCP
+    connectivity but no reply is the signature of this exact failure mode.
+  - A **trailing space in the variable's name** (not its value) is
+    invisible in the System Properties GUI and causes exactly this same
+    silent failure — if `RIG_DAEMON_ARGS` looks right but isn't being
+    picked up, check for stray whitespace in the name itself.
+  - `rigctld` reads these variables once, at the moment Task Scheduler
+    launches it. Changing `RIG_COM`/`RIG_DAEMON_ARGS` afterward (including
+    via `CapeCod()`/`Charlotte()`) does **not** affect the already-running
+    process — kill it and let the task relaunch it (or a reboot) for a
+    changed value to actually take effect.
 
 ## History
 
